@@ -31,12 +31,19 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/view/FrontPage", http.StatusFound)
 }
 
+var validPageName = regexp.MustCompile("\\[([a-zA-Z0-9]+)\\]")
+
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := LoadPage(title)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
 		return
 	}
+	p.Body = validPageName.ReplaceAllFunc(p.Body, func(s []byte) []byte {
+		pageName := string(s[1 : len(s)-1])
+		link := "<a href=\"/view/" + pageName + "\">" + pageName + "</a>"
+		return []byte(link)
+	})
 	renderTemplate(w, "view", p)
 }
 
