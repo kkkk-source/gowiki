@@ -27,11 +27,25 @@ func LoadPage(title string) (*Page, error) {
 	return &Page{Title: title, Body: body}, nil
 }
 
-func rootHandler(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/view/FrontPage", http.StatusFound)
+type PageResponse struct {
+	Title string
+	Body  template.HTML
 }
 
 var validPageName = regexp.MustCompile("\\[([a-zA-Z0-9]+)\\]")
+
+func PageResponseFromModel(p *Page) *PageResponse {
+	p.Body = validPageName.ReplaceAllFunc(p.Body, func(s []byte) []byte {
+		pageName := string(s[1 : len(s)-1])
+		link := "<a href=\"/view/" + pageName + "\">" + pageName + "</a>"
+		return []byte(link)
+	})
+	return &PageResponse{Title: p.Title, Body: template.HTML(p.Body)}
+}
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/view/FrontPage", http.StatusFound)
+}
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := LoadPage(title)
@@ -39,12 +53,8 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
 		return
 	}
-	p.Body = validPageName.ReplaceAllFunc(p.Body, func(s []byte) []byte {
-		pageName := string(s[1 : len(s)-1])
-		link := "<a href=\"/view/" + pageName + "\">" + pageName + "</a>"
-		return []byte(link)
-	})
-	renderTemplate(w, "view", p)
+	pageResponse := PageResponseFromModel(p)
+	renderTemplate(w, "view", pageResponse)
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
@@ -68,7 +78,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 
 var templates = template.Must(template.ParseFiles("./tmpl/edit.html", "./tmpl/view.html"))
 
-func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
+func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}) {
 	err := templates.ExecuteTemplate(w, tmpl+".html", p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
