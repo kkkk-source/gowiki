@@ -16,7 +16,7 @@ stop () {
     do
         if [ $img = "$1" ]; then
             docker stop $id
-            exit 0
+            exit $?
         fi
     done < <(docker ps --format "{{.ID}} {{.Image}}")
     echo
